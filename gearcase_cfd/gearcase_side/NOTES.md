@@ -13,3 +13,8 @@
   less at the same photo. Not resolved.
 - Accuracy: about +/-5-10 mm (foam caught along the lower-left edge in a few places).
 - Not included: the internal shaft and bearing housing; the overlay with the photo.
+
+## Status
+- Both user dimensions (14 in height, 14 in nose-to-shaft-tip) are estimates, not measured.
+- Working assumption: profile scaled by the 14 in height. Treat absolute mm as approximate
+  (roughly +/-15-20% given the length conflict above) until a measured dimension is available.
