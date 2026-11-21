@@ -291,24 +291,27 @@ def write_case(case: str, U: float, chord: float, length_scale: float) -> None:
         """))
 
 
-def read_cp_from_vtk(vtk_path: str, U: float) -> tuple[np.ndarray, np.ndarray]:
-    """Return (x, Cp) at body face centres from an ASCII legacy VTK polydata with cell data p."""
-    lines = open(vtk_path).read().splitlines()
-    i = next(k for k, l in enumerate(lines) if l.startswith("POINTS"))
-    npts = int(lines[i].split()[1])
-    pts = np.array([[float(v) for v in lines[i + 1 + k].split()] for k in range(npts)])
-    j = next(k for k, l in enumerate(lines) if l.startswith("POLYGONS"))
-    ncell = int(lines[j].split()[1])
-    cells = [list(map(int, lines[j + 1 + k].split()))[1:] for k in range(ncell)]
-    c = next(k for k, l in enumerate(lines) if l.startswith("CELL_DATA"))
-    s = next(k for k, l in enumerate(lines[c:], c) if l.startswith("SCALARS"))
-    vals = []
-    k = s + 2
-    while len(vals) < ncell:
-        vals.extend(float(v) for v in lines[k].split())
-        k += 1
-    p = np.array(vals[:ncell])
-    centres = np.array([pts[cell].mean(axis=0) for cell in cells])
+def read_cp_from_vtp(vtp_path: str, U: float) -> tuple[np.ndarray, np.ndarray]:
+    """Return (centres, Cp) for body faces from an ASCII XML polydata (.vtp) with cell data p."""
+    import xml.etree.ElementTree as ET
+
+    root = ET.parse(vtp_path).getroot()
+    piece = root.find(".//Piece")
+
+    def arr(parent, name=None):
+        for da in parent.iter("DataArray"):
+            if name is None or da.get("Name") == name:
+                return np.array(da.text.split(), dtype=float)
+        raise KeyError(name)
+
+    pts = arr(piece.find("Points")).reshape(-1, 3)
+    polys = piece.find("Polys")
+    conn = arr(polys, "connectivity").astype(int)
+    offs = arr(polys, "offsets").astype(int)
+    starts = np.r_[0, offs[:-1]]
+    cells = [conn[a:b] for a, b in zip(starts, offs)]
+    p = arr(piece.find("CellData"), "p")
+    centres = np.array([pts[c].mean(axis=0) for c in cells])
     return centres, p / (0.5 * U ** 2)
 
 
@@ -335,11 +338,11 @@ def main() -> None:
     fix_boundary(case)
     run_of("checkMesh", case, os.path.join(case, "log.checkMesh"))
     run_of("simpleFoam", case, os.path.join(case, "log.simpleFoam"))
-    run_of("foamToVTK -latestTime -patches '(body)' -fields '(p)'", case, os.path.join(case, "log.foamToVTK"))
+    run_of("foamToVTK -ascii -latestTime -patches '(body)' -fields '(p)'", case, os.path.join(case, "log.foamToVTK"))
 
-    vtk_dir = os.path.join(case, "VTK", "body")
-    vtk = sorted(f for f in os.listdir(vtk_dir) if f.endswith(".vtk"))[-1]
-    xc, cp = read_cp_from_vtk(os.path.join(vtk_dir, vtk), args.speed)
+    vtk_dirs = sorted(d for d in os.listdir(os.path.join(case, "VTK")) if os.path.isdir(os.path.join(case, "VTK", d)))
+    vtp = os.path.join(case, "VTK", vtk_dirs[-1], "boundary", "body.vtp")
+    xc, cp = read_cp_from_vtp(vtp, args.speed)
     out_csv = os.path.join(case, "cp_rans.csv")
     with open(out_csv, "w", newline="") as f:
         w = csv.writer(f)
