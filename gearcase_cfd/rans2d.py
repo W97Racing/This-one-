@@ -196,7 +196,7 @@ def write_case(case: str, U: float, chord: float, length_scale: float) -> None:
         divSchemes
         {
             default         none;
-            div(phi,U)      bounded Gauss linearUpwind grad(U);
+            div(phi,U)      bounded Gauss upwind;
             div(phi,k)      bounded Gauss upwind;
             div(phi,omega)  bounded Gauss upwind;
             div((nuEff*dev2(T(grad(U))))) Gauss linear;
@@ -220,8 +220,8 @@ def write_case(case: str, U: float, chord: float, length_scale: float) -> None:
         }
         relaxationFactors
         {
-            fields { p 0.3; }
-            equations { U 0.7; "(k|omega)" 0.7; }
+            fields { p 0.1; }
+            equations { U 0.3; "(k|omega)" 0.3; }
         }
         """))
     write_dict(f"{case}/0/U", "volVectorField", "U", textwrap.dedent(f"""\
